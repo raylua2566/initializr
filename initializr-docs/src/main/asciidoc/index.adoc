@@ -1,13 +1,19 @@
 = Spring Initializr Reference Guide
 Stéphane Nicoll; Dave Syer
 :doctype: book
-:toc:
+:idprefix:
+:idseparator: -
+:toc: left
 :toclevels: 4
-:source-highlighter: prettify
+:tabsize: 4
 :numbered:
+:sectanchors:
+:sectnums:
 :icons: font
 :hide-uri-scheme:
-:test-examples: ../../test/java/io/spring/initializr
+:docinfo: shared,private
+
+:test-examples: {sources-root}/test/java/io/spring/initializr
 :initializr-repo: snapshot
 :github-tag: master
 :github-repo: spring-io/initializr
@@ -18,7 +24,7 @@ Stéphane Nicoll; Dave Syer
 :sc-initializr-generator: {github-code}/initializr-generator/src/main/java/io/spring/initializr
 :spring-initializr-docs-version: current
 :spring-initializr-docs: http://docs.spring.io/initializr/docs/{spring-initializr-docs-version}/reference
-:spring-initializr-docs-current: http://docs.spring.io/initializr/docs/current/reference
+:spring-initializr-docs-current: http://docs.spring.io/initializr/docs/current/reference/html
 :spring-boot-reference: http://docs.spring.io/spring-boot/docs/{spring-boot-docs-version}/reference/htmlsingle
 
 // ======================================================================================

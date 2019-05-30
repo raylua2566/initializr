@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,11 +16,10 @@
 
 package io.spring.initializr.web;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,22 +27,17 @@ import java.util.List;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.spring.initializr.metadata.InitializrMetadata;
-import io.spring.initializr.metadata.InitializrMetadataBuilder;
-import io.spring.initializr.metadata.InitializrMetadataProvider;
-import io.spring.initializr.metadata.InitializrProperties;
-import io.spring.initializr.test.generator.ProjectAssert;
+import io.spring.initializr.generator.spring.test.ProjectAssert;
 import io.spring.initializr.web.AbstractInitializrIntegrationTests.Config;
 import io.spring.initializr.web.mapper.InitializrMetadataVersion;
-import io.spring.initializr.web.support.DefaultInitializrMetadataProvider;
+import io.spring.initializr.web.support.InitializrMetadataUpdateStrategy;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.taskdefs.Expand;
 import org.apache.tools.ant.taskdefs.Untar;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.junitpioneer.jupiter.TempDirectory;
+import org.junit.jupiter.api.io.TempDir;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 
@@ -66,7 +60,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * @author Stephane Nicoll
  */
-@ExtendWith(TempDirectory.class)
 @SpringBootTest(classes = Config.class)
 public abstract class AbstractInitializrIntegrationTests {
 
@@ -75,7 +68,7 @@ public abstract class AbstractInitializrIntegrationTests {
 
 	private static final ObjectMapper objectMapper = new ObjectMapper();
 
-	public File folder;
+	public Path folder;
 
 	@Autowired
 	private RestTemplateBuilder restTemplateBuilder;
@@ -83,19 +76,12 @@ public abstract class AbstractInitializrIntegrationTests {
 	private RestTemplate restTemplate;
 
 	@BeforeEach
-	public void before(@TempDirectory.TempDir Path folder) {
+	public void before(@TempDir Path folder) {
 		this.restTemplate = this.restTemplateBuilder.build();
-		this.folder = folder.toFile();
+		this.folder = folder;
 	}
 
 	protected abstract String createUrl(String context);
-
-	protected String htmlHome() {
-		HttpHeaders headers = new HttpHeaders();
-		headers.setAccept(Collections.singletonList(MediaType.TEXT_HTML));
-		return this.restTemplate.exchange(createUrl("/"), HttpMethod.GET,
-				new HttpEntity<Void>(headers), String.class).getBody();
-	}
 
 	/**
 	 * Validate the "Content-Type" header of the specified response.
@@ -172,17 +158,17 @@ public abstract class AbstractInitializrIntegrationTests {
 	}
 
 	protected ProjectAssert downloadZip(String context) {
-		byte[] body = downloadArchive(context);
+		byte[] body = downloadArchive(context).getBody();
 		return zipProjectAssert(body);
 	}
 
 	protected ProjectAssert downloadTgz(String context) {
-		byte[] body = downloadArchive(context);
+		byte[] body = downloadArchive(context).getBody();
 		return tgzProjectAssert(body);
 	}
 
-	protected byte[] downloadArchive(String context) {
-		return this.restTemplate.getForObject(createUrl(context), byte[].class);
+	protected ResponseEntity<byte[]> downloadArchive(String context) {
+		return this.restTemplate.getForEntity(createUrl(context), byte[].class);
 	}
 
 	protected ResponseEntity<String> invokeHome(String userAgentHeader,
@@ -212,9 +198,8 @@ public abstract class AbstractInitializrIntegrationTests {
 
 	protected ProjectAssert projectAssert(byte[] content, ArchiveType archiveType) {
 		try {
-			File archiveFile = writeArchive(content);
-
-			File project = new File(this.folder, "project");
+			Path archiveFile = writeArchive(content);
+			Path project = this.folder.resolve("project");
 			switch (archiveType) {
 			case ZIP:
 				unzip(archiveFile, project);
@@ -230,38 +215,36 @@ public abstract class AbstractInitializrIntegrationTests {
 		}
 	}
 
-	private void untar(File archiveFile, File project) {
+	private void untar(Path archiveFile, Path project) {
 		Untar expand = new Untar();
 		expand.setProject(new Project());
-		expand.setDest(project);
-		expand.setSrc(archiveFile);
+		expand.setDest(project.toFile());
+		expand.setSrc(archiveFile.toFile());
 		Untar.UntarCompressionMethod method = new Untar.UntarCompressionMethod();
 		method.setValue("gzip");
 		expand.setCompression(method);
 		expand.execute();
 	}
 
-	private void unzip(File archiveFile, File project) {
+	private void unzip(Path archiveFile, Path project) {
 		Expand expand = new Expand();
 		expand.setProject(new Project());
-		expand.setDest(project);
-		expand.setSrc(archiveFile);
+		expand.setDest(project.toFile());
+		expand.setSrc(archiveFile.toFile());
 		expand.execute();
 	}
 
-	protected File writeArchive(byte[] body) throws IOException {
-		File archiveFile = new File(this.folder, "archive");
-		try (FileOutputStream stream = new FileOutputStream(archiveFile)) {
-			stream.write(body);
-		}
+	protected Path writeArchive(byte[] body) throws IOException {
+		Path archiveFile = this.folder.resolve("archive");
+		Files.write(archiveFile, body);
 		return archiveFile;
 	}
 
 	protected JSONObject readJsonFrom(String path) {
 		try {
 			ClassPathResource resource = new ClassPathResource(path);
-			try (InputStream stream = resource.getInputStream()) {
-				String json = StreamUtils.copyToString(stream, Charset.forName("UTF-8"));
+			try (InputStream in = resource.getInputStream()) {
+				String json = StreamUtils.copyToString(in, Charset.forName("UTF-8"));
 				String placeholder = "";
 				if (this instanceof AbstractInitializrControllerIntegrationTests) {
 					placeholder = ((AbstractInitializrControllerIntegrationTests) this).host;
@@ -296,17 +279,10 @@ public abstract class AbstractInitializrIntegrationTests {
 	@EnableAutoConfiguration
 	public static class Config {
 
+		// Disable metadata fetching from spring.io
 		@Bean
-		public InitializrMetadataProvider initializrMetadataProvider(
-				InitializrProperties properties) {
-			return new DefaultInitializrMetadataProvider(InitializrMetadataBuilder
-					.fromInitializrProperties(properties).build(), new ObjectMapper(),
-					new RestTemplate()) {
-				@Override
-				protected void updateInitializrMetadata(InitializrMetadata metadata) {
-					// Disable metadata fetching from spring.io
-				}
-			};
+		public InitializrMetadataUpdateStrategy initializrMetadataUpdateStrategy() {
+			return (metadata) -> metadata;
 		}
 
 	}

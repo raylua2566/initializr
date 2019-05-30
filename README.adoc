@@ -24,18 +24,19 @@ NOTE: Check the https://github.com/spring-io/initializr/milestones[milestones pa
 overview of the changes.
 
 == Installation and Getting Started
-The {docs}/htmlsingle/[reference documentation] is published in
-{docs}/htmlsingle/[HTML] and {docs}/epub/initializr-reference.epub[EPUB] formats.
+The reference documentation is available in {docs}/html/[HTML format].
 
 
 == Modules
 Spring Initializr has the following modules:
 
-* `initializr-generator`: standalone project generation library that can be reused
-in many environments (including embedded in your own project)
+* `initializr-generator`: core project generation library
+* `initializr-metadata`: metadata infrastructure for various aspects of the project
+* `initializr-generator-spring`: optional module defining the conventions for a Spring
+Boot project. Can be replaced by your own conventions if necessary.
 * `initializr-web`: REST endpoints and web interface
-* `initializr-actuator`: optional module to provide statistics and metrics on project
-generation
+* `initializr-actuator`: optional module to provide additional information and statistics
+on project generation
 * `initializr-docs`: documentation
 
 == Supported interfaces
@@ -51,7 +52,7 @@ https://github.com/AlexFalappa/nb-springboot[this plugin])
 [TIP]
 ====
 You can "curl" an instance to get a usage page with examples (try
-`curl start.spring.io`)
+`curl https://start.spring.io`)
 ====
 
 == Generating a project
@@ -152,7 +153,7 @@ The metadata also lists the default values for simple _text_ parameter (i.e. the
 default `name` for the project).
 
 NOTE: More details about the structure of the metadata are
-{docs}/htmlsingle/#metadata-format[available in the documentation].
+{docs}/html/#metadata-format[available in the documentation].
 
 == Running your own instance
 
@@ -162,7 +163,7 @@ deploy the service.
 
 You first need to create or update your configuration to define the necessary
 attributes that your instance will use. Again, check the documentation for a
-{docs}/htmlsingle/#configuration-format[description of the configuration] and
+{docs}/html/#create-instance[description of the configuration] and
 {service}[review our own config] for a sample.
 
 You can integrate the library in a traditional Java-based project or by writing the
@@ -188,7 +189,8 @@ in the same directory and simply execute this command to start the service:
 $ spring run my-instance.groovy
 ----
 
-You may also want to <<run-app,run the default instance locally>>.
+You may also want to https://github.com/spring-io/start.spring.io#run-app[run the default
+instance locally].
 
 
 [[build]]
@@ -206,14 +208,6 @@ Just invoke the build at the root of the project
     $ ./mvnw clean install
 ----
 
-If you want to run the smoke tests using Geb, you need to enable the
-`smokeTests` profile. Firefox should also be installed on your machine:
-
-[indent=0]
-----
-    $ ./mvnw verify -PsmokeTests
-----
-
 To generate the docs as well, you should enable the `full` profile:
 
 [indent=0]
@@ -223,4 +217,4 @@ To generate the docs as well, you should enable the `full` profile:
 
 == License
 Spring Initializr is Open Source software released under the
-http://www.apache.org/licenses/LICENSE-2.0.html[Apache 2.0 license].
+https://www.apache.org/licenses/LICENSE-2.0.html[Apache 2.0 license].

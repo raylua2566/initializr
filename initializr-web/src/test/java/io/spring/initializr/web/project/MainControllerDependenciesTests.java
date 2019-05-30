@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,11 +33,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Stephane Nicoll
  */
 @ActiveProfiles("test-default")
-public class MainControllerDependenciesTests
+class MainControllerDependenciesTests
 		extends AbstractInitializrControllerIntegrationTests {
 
 	@Test
-	public void noBootVersion() throws JSONException {
+	void noBootVersion() throws JSONException {
 		ResponseEntity<String> response = execute("/dependencies", String.class, null,
 				"application/json");
 		assertThat(response.getHeaders().getFirst(HttpHeaders.ETAG)).isNotNull();
@@ -46,7 +46,7 @@ public class MainControllerDependenciesTests
 	}
 
 	@Test
-	public void filteredDependencies() throws JSONException {
+	void filteredDependencies() throws JSONException {
 		ResponseEntity<String> response = execute(
 				"/dependencies?bootVersion=2.2.1.RELEASE", String.class, null,
 				"application/json");

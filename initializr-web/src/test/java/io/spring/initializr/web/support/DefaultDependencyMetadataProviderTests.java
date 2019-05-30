@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,13 +16,13 @@
 
 package io.spring.initializr.web.support;
 
+import io.spring.initializr.generator.spring.test.InitializrMetadataTestBuilder;
+import io.spring.initializr.generator.version.Version;
 import io.spring.initializr.metadata.BillOfMaterials;
 import io.spring.initializr.metadata.Dependency;
 import io.spring.initializr.metadata.DependencyMetadata;
 import io.spring.initializr.metadata.DependencyMetadataProvider;
 import io.spring.initializr.metadata.InitializrMetadata;
-import io.spring.initializr.test.metadata.InitializrMetadataTestBuilder;
-import io.spring.initializr.util.Version;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,12 +30,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * @author Stephane Nicoll
  */
-public class DefaultDependencyMetadataProviderTests {
+class DefaultDependencyMetadataProviderTests {
 
 	private final DependencyMetadataProvider provider = new DefaultDependencyMetadataProvider();
 
 	@Test
-	public void filterDependencies() {
+	void filterDependencies() {
 		Dependency first = Dependency.withId("first", "org.foo", "first");
 		first.setVersionRange("2.1.4.RELEASE");
 		Dependency second = Dependency.withId("second", "org.foo", "second");
@@ -53,7 +53,7 @@ public class DefaultDependencyMetadataProviderTests {
 	}
 
 	@Test
-	public void resolveDependencies() {
+	void resolveDependencies() {
 		Dependency first = Dependency.withId("first", "org.foo", "first");
 		first.getMappings().add(Dependency.Mapping.create(
 				"[1.0.0.RELEASE, 1.1.0.RELEASE)", "org.bar", "second", "0.1.0.RELEASE"));
@@ -86,7 +86,7 @@ public class DefaultDependencyMetadataProviderTests {
 	}
 
 	@Test
-	public void addRepoAndRemoveDuplicates() {
+	void addRepoAndRemoveDuplicates() {
 		Dependency first = Dependency.withId("first", "org.foo", "first");
 		first.setRepository("repo-foo");
 		Dependency second = Dependency.withId("second", "org.foo", "second");
@@ -105,7 +105,7 @@ public class DefaultDependencyMetadataProviderTests {
 	}
 
 	@Test
-	public void addBomAndRemoveDuplicates() {
+	void addBomAndRemoveDuplicates() {
 		Dependency first = Dependency.withId("first", "org.foo", "first");
 		first.setBom("bom-foo");
 		Dependency second = Dependency.withId("second", "org.foo", "second");
@@ -134,7 +134,7 @@ public class DefaultDependencyMetadataProviderTests {
 	}
 
 	@Test
-	public void repoFromBomAccordingToVersion() {
+	void repoFromBomAccordingToVersion() {
 		DependencyMetadata dependencyMetadata = testRepoFromBomAccordingToVersion(
 				"1.0.9.RELEASE");
 		assertThat(dependencyMetadata.getBootVersion())
@@ -155,7 +155,7 @@ public class DefaultDependencyMetadataProviderTests {
 	}
 
 	@Test
-	public void repoFromBomAccordingToAnotherVersion() {
+	void repoFromBomAccordingToAnotherVersion() {
 		DependencyMetadata dependencyMetadata = testRepoFromBomAccordingToVersion(
 				"1.1.5.RELEASE");
 		assertThat(dependencyMetadata.getBootVersion())

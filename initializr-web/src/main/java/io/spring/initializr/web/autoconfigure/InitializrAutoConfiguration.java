@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,28 +16,30 @@
 
 package io.spring.initializr.web.autoconfigure;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.file.Files;
 
 import javax.cache.configuration.MutableConfiguration;
 import javax.cache.expiry.CreatedExpiryPolicy;
 import javax.cache.expiry.Duration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.spring.initializr.generator.ProjectGenerator;
-import io.spring.initializr.generator.ProjectRequestPostProcessor;
-import io.spring.initializr.generator.ProjectRequestResolver;
-import io.spring.initializr.generator.ProjectResourceLocator;
+import io.spring.initializr.generator.io.IndentingWriterFactory;
+import io.spring.initializr.generator.io.SimpleIndentStrategy;
+import io.spring.initializr.generator.io.template.MustacheTemplateRenderer;
+import io.spring.initializr.generator.io.template.TemplateRenderer;
+import io.spring.initializr.generator.project.ProjectDirectoryFactory;
 import io.spring.initializr.metadata.DependencyMetadataProvider;
 import io.spring.initializr.metadata.InitializrMetadata;
 import io.spring.initializr.metadata.InitializrMetadataBuilder;
 import io.spring.initializr.metadata.InitializrMetadataProvider;
 import io.spring.initializr.metadata.InitializrProperties;
-import io.spring.initializr.util.TemplateRenderer;
 import io.spring.initializr.web.project.MainController;
+import io.spring.initializr.web.project.ProjectGenerationInvoker;
+import io.spring.initializr.web.project.ProjectRequestToDescriptionConverter;
 import io.spring.initializr.web.support.DefaultDependencyMetadataProvider;
 import io.spring.initializr.web.support.DefaultInitializrMetadataProvider;
-import io.spring.initializr.web.ui.UiController;
+import io.spring.initializr.web.support.DefaultInitializrMetadataUpdateStrategy;
+import io.spring.initializr.web.support.InitializrMetadataUpdateStrategy;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -50,18 +52,19 @@ import org.springframework.boot.autoconfigure.web.client.RestTemplateAutoConfigu
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.support.NoOpCache;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
-import org.springframework.web.servlet.resource.ResourceUrlProvider;
 
 /**
  * {@link org.springframework.boot.autoconfigure.EnableAutoConfiguration
  * Auto-configuration} to configure Spring initializr. In a web environment, configures
  * the necessary controller to serve the applications from the root context.
- *
- * <p>
- * Project generation can be customized by defining a custom {@link ProjectGenerator}.
  *
  * @author Stephane Nicoll
  */
@@ -71,51 +74,55 @@ import org.springframework.web.servlet.resource.ResourceUrlProvider;
 		RestTemplateAutoConfiguration.class })
 public class InitializrAutoConfiguration {
 
-	private final List<ProjectRequestPostProcessor> postProcessors;
-
-	public InitializrAutoConfiguration(
-			ObjectProvider<List<ProjectRequestPostProcessor>> postProcessors) {
-		List<ProjectRequestPostProcessor> list = postProcessors.getIfAvailable();
-		this.postProcessors = (list != null) ? list : new ArrayList<>();
+	@Bean
+	@ConditionalOnMissingBean
+	public ProjectDirectoryFactory projectDirectoryFactory() {
+		return (description) -> Files.createTempDirectory("project-");
 	}
 
 	@Bean
 	@ConditionalOnMissingBean
-	public ProjectGenerator projectGenerator() {
-		return new ProjectGenerator();
+	public IndentingWriterFactory indentingWriterFactory() {
+		return IndentingWriterFactory.create(new SimpleIndentStrategy("\t"));
+	}
+
+	@Bean
+	@ConditionalOnMissingBean(TemplateRenderer.class)
+	public MustacheTemplateRenderer templateRenderer(Environment environment,
+			ObjectProvider<CacheManager> cacheManager) {
+		return new MustacheTemplateRenderer("classpath:/templates",
+				determineCache(environment, cacheManager.getIfAvailable()));
+	}
+
+	private Cache determineCache(Environment environment, CacheManager cacheManager) {
+		if (cacheManager != null) {
+			Binder binder = Binder.get(environment);
+			boolean cache = binder.bind("spring.mustache.cache", Boolean.class)
+					.orElse(true);
+			if (cache) {
+				return cacheManager.getCache("initializr.templates");
+			}
+		}
+		return new NoOpCache("templates");
 	}
 
 	@Bean
 	@ConditionalOnMissingBean
-	public TemplateRenderer templateRenderer(Environment environment) {
-		Binder binder = Binder.get(environment);
-		boolean cache = binder.bind("spring.mustache.cache", Boolean.class).orElse(true);
-		TemplateRenderer templateRenderer = new TemplateRenderer();
-		templateRenderer.setCache(cache);
-		return templateRenderer;
-	}
-
-	@Bean
-	@ConditionalOnMissingBean
-	public ProjectRequestResolver projectRequestResolver() {
-		return new ProjectRequestResolver(this.postProcessors);
-	}
-
-	@Bean
-	@ConditionalOnMissingBean
-	public ProjectResourceLocator projectResourceLocator() {
-		return new ProjectResourceLocator();
+	public InitializrMetadataUpdateStrategy initializrMetadataUpdateStrategy(
+			RestTemplateBuilder restTemplateBuilder, ObjectMapper objectMapper) {
+		return new DefaultInitializrMetadataUpdateStrategy(restTemplateBuilder.build(),
+				objectMapper);
 	}
 
 	@Bean
 	@ConditionalOnMissingBean(InitializrMetadataProvider.class)
 	public InitializrMetadataProvider initializrMetadataProvider(
-			InitializrProperties properties, ObjectMapper objectMapper,
-			RestTemplateBuilder restTemplateBuilder) {
+			InitializrProperties properties,
+			InitializrMetadataUpdateStrategy initializrMetadataUpdateStrategy) {
 		InitializrMetadata metadata = InitializrMetadataBuilder
 				.fromInitializrProperties(properties).build();
-		return new DefaultInitializrMetadataProvider(metadata, objectMapper,
-				restTemplateBuilder.build());
+		return new DefaultInitializrMetadataProvider(metadata,
+				initializrMetadataUpdateStrategy);
 	}
 
 	@Bean
@@ -141,18 +148,30 @@ public class InitializrAutoConfiguration {
 		public MainController initializrMainController(
 				InitializrMetadataProvider metadataProvider,
 				TemplateRenderer templateRenderer,
-				ResourceUrlProvider resourceUrlProvider,
-				ProjectGenerator projectGenerator,
-				DependencyMetadataProvider dependencyMetadataProvider) {
+				DependencyMetadataProvider dependencyMetadataProvider,
+				ProjectGenerationInvoker projectGenerationInvoker) {
 			return new MainController(metadataProvider, templateRenderer,
-					resourceUrlProvider, projectGenerator, dependencyMetadataProvider);
+					dependencyMetadataProvider, projectGenerationInvoker);
 		}
 
 		@Bean
 		@ConditionalOnMissingBean
-		public UiController initializrUiController(
-				InitializrMetadataProvider metadataProvider) {
-			return new UiController(metadataProvider);
+		public ProjectGenerationInvoker projectGenerationInvoker(
+				ApplicationContext applicationContext,
+				ApplicationEventPublisher eventPublisher,
+				ProjectRequestToDescriptionConverter projectRequestToDescriptionConverter) {
+			return new ProjectGenerationInvoker(applicationContext, eventPublisher,
+					projectRequestToDescriptionConverter);
+		}
+
+		@Bean
+		public ProjectRequestToDescriptionConverter projectRequestToDescriptionConverter() {
+			return new ProjectRequestToDescriptionConverter();
+		}
+
+		@Bean
+		public InitializrModule InitializrJacksonModule() {
+			return new InitializrModule();
 		}
 
 	}
@@ -172,6 +191,7 @@ public class InitializrAutoConfiguration {
 								CreatedExpiryPolicy.factoryOf(Duration.TEN_MINUTES)));
 				cacheManager.createCache("initializr.dependency-metadata", config());
 				cacheManager.createCache("initializr.project-resources", config());
+				cacheManager.createCache("initializr.templates", config());
 			};
 		}
 

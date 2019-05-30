@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,11 +19,11 @@ package io.spring.initializr.web.mapper;
 import java.net.URL;
 import java.util.Collections;
 
+import io.spring.initializr.generator.version.Version;
 import io.spring.initializr.metadata.BillOfMaterials;
 import io.spring.initializr.metadata.Dependency;
 import io.spring.initializr.metadata.DependencyMetadata;
 import io.spring.initializr.metadata.Repository;
-import io.spring.initializr.util.Version;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 
@@ -32,12 +32,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * @author Stephane Nicoll
  */
-public class DependencyMetadataJsonMapperTests {
+class DependencyMetadataJsonMapperTests {
 
 	private final DependencyMetadataJsonMapper mapper = new DependencyMetadataV21JsonMapper();
 
 	@Test
-	public void mapDependency() throws Exception {
+	void mapDependency() throws Exception {
 		Dependency d = Dependency.withId("foo", "org.foo", "foo");
 		d.setRepository("my-repo");
 		d.setBom("my-bom");

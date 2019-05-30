@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -47,7 +47,7 @@ import static org.assertj.core.api.Assertions.fail;
  */
 @Import(StatsMockController.class)
 @ActiveProfiles({ "test-default", "test-custom-stats" })
-public class MainControllerStatsIntegrationTests
+class MainControllerStatsIntegrationTests
 		extends AbstractFullStackInitializrIntegrationTests {
 
 	@Autowired
@@ -65,7 +65,7 @@ public class MainControllerStatsIntegrationTests
 	}
 
 	@Test
-	public void simpleProject() {
+	void simpleProject() {
 		downloadArchive("/starter.zip?groupId=com.foo&artifactId=bar&dependencies=web");
 		assertThat(this.statsMockController.stats).as("No stat got generated").hasSize(1);
 		StatsMockController.Content content = this.statsMockController.stats.get(0);
@@ -73,13 +73,13 @@ public class MainControllerStatsIntegrationTests
 		JsonNode json = parseJson(content.json);
 		assertThat(json.get("groupId").textValue()).isEqualTo("com.foo");
 		assertThat(json.get("artifactId").textValue()).isEqualTo("bar");
-		JsonNode list = json.get("dependencies");
+		JsonNode list = json.get("dependencies").get("values");
 		assertThat(list).hasSize(1);
 		assertThat(list.get(0).textValue()).isEqualTo("web");
 	}
 
 	@Test
-	public void authorizationHeaderIsSet() {
+	void authorizationHeaderIsSet() {
 		downloadArchive("/starter.zip");
 		assertThat(this.statsMockController.stats).as("No stat got generated").hasSize(1);
 		StatsMockController.Content content = this.statsMockController.stats.get(0);
@@ -94,7 +94,7 @@ public class MainControllerStatsIntegrationTests
 	}
 
 	@Test
-	public void requestIpNotSetByDefault() {
+	void requestIpNotSetByDefault() {
 		downloadArchive("/starter.zip?groupId=com.foo&artifactId=bar&dependencies=web");
 		assertThat(this.statsMockController.stats).as("No stat got generated").hasSize(1);
 		StatsMockController.Content content = this.statsMockController.stats.get(0);
@@ -105,7 +105,7 @@ public class MainControllerStatsIntegrationTests
 	}
 
 	@Test
-	public void requestIpIsSetWhenHeaderIsPresent() throws Exception {
+	void requestIpIsSetWhenHeaderIsPresent() throws Exception {
 		RequestEntity<?> request = RequestEntity.get(new URI(createUrl("/starter.zip")))
 				.header("X-FORWARDED-FOR", "10.0.0.123").build();
 		getRestTemplate().exchange(request, String.class);
@@ -113,12 +113,12 @@ public class MainControllerStatsIntegrationTests
 		StatsMockController.Content content = this.statsMockController.stats.get(0);
 
 		JsonNode json = parseJson(content.json);
-		assertThat(json.get("requestIp").textValue()).as("Wrong requestIp")
+		assertThat(json.get("client").get("ip").textValue()).as("Wrong requestIp")
 				.isEqualTo("10.0.0.123");
 	}
 
 	@Test
-	public void requestIpv4IsNotSetWhenHeaderHasGarbage() throws Exception {
+	void requestIpv4IsNotSetWhenHeaderHasGarbage() throws Exception {
 		RequestEntity<?> request = RequestEntity.get(new URI(createUrl("/starter.zip")))
 				.header("x-forwarded-for", "foo-bar").build();
 		getRestTemplate().exchange(request, String.class);
@@ -132,7 +132,7 @@ public class MainControllerStatsIntegrationTests
 	}
 
 	@Test
-	public void requestCountryIsNotSetWhenHeaderIsSetToXX() throws Exception {
+	void requestCountryIsNotSetWhenHeaderIsSetToXX() throws Exception {
 		RequestEntity<?> request = RequestEntity.get(new URI(createUrl("/starter.zip")))
 				.header("cf-ipcountry", "XX").build();
 		getRestTemplate().exchange(request, String.class);
@@ -146,7 +146,7 @@ public class MainControllerStatsIntegrationTests
 	}
 
 	@Test
-	public void invalidProjectSillHasStats() {
+	void invalidProjectSillHasStats() {
 		try {
 			downloadArchive("/starter.zip?type=invalid-type");
 			fail("Should have failed to generate project with invalid type");
@@ -160,14 +160,16 @@ public class MainControllerStatsIntegrationTests
 		JsonNode json = parseJson(content.json);
 		assertThat(json.get("groupId").textValue()).isEqualTo("com.example");
 		assertThat(json.get("artifactId").textValue()).isEqualTo("demo");
-		assertThat(json.get("invalid").booleanValue()).isEqualTo(true);
-		assertThat(json.get("invalidType").booleanValue()).isEqualTo(true);
-		assertThat(json.get("errorMessage")).isNotNull();
-		assertThat(json.get("errorMessage").textValue()).contains("invalid-type");
+		assertThat(json.has("errorState")).isTrue();
+		JsonNode errorState = json.get("errorState");
+		assertThat(errorState.get("invalid").booleanValue()).isEqualTo(true);
+		assertThat(errorState.get("type").booleanValue()).isEqualTo(true);
+		assertThat(errorState.get("message")).isNotNull();
+		assertThat(errorState.get("message").textValue()).contains("invalid-type");
 	}
 
 	@Test
-	public void errorPublishingStatsDoesNotBubbleUp() {
+	void errorPublishingStatsDoesNotBubbleUp() {
 		this.projectGenerationStatPublisher.updateRequestUrl(
 				URI.create("http://localhost:" + this.port + "/elastic-error"));
 		downloadArchive("/starter.zip");

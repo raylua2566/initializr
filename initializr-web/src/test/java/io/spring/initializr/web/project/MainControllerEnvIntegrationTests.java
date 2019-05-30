@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,7 @@ package io.spring.initializr.web.project;
 
 import java.net.URI;
 
-import io.spring.initializr.test.generator.ProjectAssert;
+import io.spring.initializr.generator.spring.test.ProjectAssert;
 import io.spring.initializr.web.AbstractInitializrControllerIntegrationTests;
 import org.junit.jupiter.api.Test;
 
@@ -34,11 +34,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Stephane Nicoll
  */
 @ActiveProfiles({ "test-default", "test-custom-env" })
-public class MainControllerEnvIntegrationTests
+class MainControllerEnvIntegrationTests
 		extends AbstractInitializrControllerIntegrationTests {
 
 	@Test
-	public void downloadCliWithCustomRepository() throws Exception {
+	void downloadCliWithCustomRepository() throws Exception {
 		ResponseEntity<?> entity = getRestTemplate().getForEntity(createUrl("/spring"),
 				String.class);
 		assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.FOUND);
@@ -47,18 +47,12 @@ public class MainControllerEnvIntegrationTests
 	}
 
 	@Test
-	public void generateProjectWithInvalidName() {
+	void generateProjectWithInvalidName() {
 		downloadZip("/starter.zip?style=data-jpa&name=Invalid")
 				.isJavaProject(ProjectAssert.DEFAULT_PACKAGE_NAME, "FooBarApplication")
 				.isMavenProject().hasStaticAndTemplatesResources(false).pomAssert()
 				.hasDependenciesCount(2).hasSpringBootStarterDependency("data-jpa")
 				.hasSpringBootStarterTest();
-	}
-
-	@Test
-	public void googleAnalytics() {
-		String body = htmlHome();
-		assertThat(body).contains("https://www.googletagmanager.com/gtm.js");
 	}
 
 }

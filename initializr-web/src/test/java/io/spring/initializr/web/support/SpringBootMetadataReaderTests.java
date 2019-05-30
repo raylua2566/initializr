@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,7 +40,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
  * @author Stephane Nicoll
  * @author Dave Syer
  */
-public class SpringBootMetadataReaderTests {
+class SpringBootMetadataReaderTests {
 
 	private final InitializrMetadata metadata = InitializrMetadataBuilder.create()
 			.build();
@@ -53,7 +53,7 @@ public class SpringBootMetadataReaderTests {
 			.bindTo(this.restTemplate).build();
 
 	@Test
-	public void readAvailableVersions() throws IOException {
+	void readAvailableVersions() throws IOException {
 		this.server.expect(requestTo("https://spring.io/project_metadata/spring-boot"))
 				.andRespond(withSuccess(
 						new ClassPathResource("metadata/sagan/spring-boot.json"),

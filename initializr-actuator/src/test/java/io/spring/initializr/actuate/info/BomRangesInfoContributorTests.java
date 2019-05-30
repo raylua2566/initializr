@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,10 +18,10 @@ package io.spring.initializr.actuate.info;
 
 import java.util.Map;
 
+import io.spring.initializr.generator.spring.test.InitializrMetadataTestBuilder;
 import io.spring.initializr.metadata.BillOfMaterials;
 import io.spring.initializr.metadata.InitializrMetadata;
 import io.spring.initializr.metadata.SimpleInitializrMetadataProvider;
-import io.spring.initializr.test.metadata.InitializrMetadataTestBuilder;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.actuate.info.Info;
@@ -34,10 +34,10 @@ import static org.assertj.core.api.Assertions.entry;
  *
  * @author Stephane Nicoll
  */
-public class BomRangesInfoContributorTests {
+class BomRangesInfoContributorTests {
 
 	@Test
-	public void noBom() {
+	void noBom() {
 		InitializrMetadata metadata = InitializrMetadataTestBuilder.withDefaults()
 				.build();
 		Info info = getInfo(metadata);
@@ -45,7 +45,7 @@ public class BomRangesInfoContributorTests {
 	}
 
 	@Test
-	public void noMapping() {
+	void noMapping() {
 		BillOfMaterials bom = BillOfMaterials.create("com.example", "bom", "1.0.0");
 		InitializrMetadata metadata = InitializrMetadataTestBuilder.withDefaults()
 				.addBom("foo", bom).build();
@@ -54,7 +54,7 @@ public class BomRangesInfoContributorTests {
 	}
 
 	@Test
-	public void withMappings() {
+	void withMappings() {
 		BillOfMaterials bom = BillOfMaterials.create("com.example", "bom", "1.0.0");
 		bom.getMappings().add(
 				BillOfMaterials.Mapping.create("[1.3.0.RELEASE,1.3.8.RELEASE]", "1.1.0"));

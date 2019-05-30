@@ -9,20 +9,91 @@ advanced tips to make sure the available options are consistent with the chosen 
 Boot generation.
 --
 
+[[project-generation]]
+== Project generation concepts
+Spring Initializr offers an API for project generation that can be reused in many
+contexts. So far, we've mentioned how we've used it on start.spring.io but the low-level
+concepts are quite independent from that as you'll discover in the section.
+
+Project generation requires a `ProjectDescription` that gathers several properties from
+the project:
+
+* A platform `Version` used by the project. This helps fine-tuning available dependencies
+according to the chosen generation.
+* The `BuildSystem` and `Packaging`
+* The JVM `Language`
+* The requested dependencies, indexed by ID
+* Basic coordinates such as `groupId`, `artifactId`, `name`, `description`
+* The name of the `application`
+* The root package name
+* The base directory for the project
+
+Convenient implementations for those concepts are available:
+
+* A `Build` abstraction model with dedicated models for Apache Maven and Gradle. A writer
+abstraction to generate `pom.xml`, `build.gradle` and `settings.gradle` files is also
+available
+* Out-of-the-box support for `jar` and `war` packaging
+* Source code model and writers for Java, Kotlin and Apache Groovy
+
+Based on a project description, project generation occurs in a dedicated
+`ProjectGenerationContext` where the following happens:
+
+* Components that should be invoked for the described project are identified
+* Customizers populates and customizes models for various assets of the project (build
+file, source code, etc)
+* Contributors use the models to generate assets in a directory structure
+
+Available components are declared in a `@ProjectGenerationConfiguration`-annotated
+configuration class that is registered in `META-INF/spring.factories`:
+
+[indent=0]
+----
+io.spring.initializr.generator.project.ProjectGenerationConfiguration=\
+com.example.acme.build.BuildProjectGenerationConfiguration,\
+com.example.acme.code.SourceCodeProjectGenerationConfiguration
+----
+
+
+=== Project generation conditions
+Spring Initializr offers several conditions that components defined in the
+`ProjectGenerationContext` can declare to only run when necessary. This avoids exposing
+beans that have to check if they have to do something and makes the declaration more
+idiomatic.
+
+Consider the following example:
+
+[source,java,indent=0]
+----
+	@Bean
+	@ConditionalOnBuildSystem(GradleBuildSystem.ID)
+	@ConditionalOnPackaging(WarPackaging.ID)
+	public BuildCustomizer<GradleBuild> warPluginContributor() {
+		return (build) -> build.addPlugin("war");
+	}
+----
+
+This registers a bean only if the project to generate uses Gradle and `war` packaging.
+Check the `io.spring.initializr.generator.condition` package for more details. Custom
+conditions can easily be created by inheriting from `ProjectGenerationCondition`.
+
 
 
 [[create-instance]]
 == Creating your own instance
-Spring Initializr is split across three main modules:
+Spring Initializr is split across several modules:
 
-* `initializr-generator`: standalone project generation library that can be reused in
-many environments (including embedded in your own project)
-* `initializr-web`: API endpoints and web interface
-* `initializr-actuator`: optional module to provide statistics and metrics on project
-generation
+* `initializr-generator`: core project generation library
+* `initializr-metadata`: metadata infrastructure for various aspects of the project
+* `initializr-generator-spring`: optional module defining the conventions for a Spring
+Boot project. Can be replaced by your own conventions if necessary.
+* `initializr-web`: REST endpoints and web interface
+* `initializr-actuator`: optional module to provide additional information and statistics
+on project generation
+* `initializr-docs`: documentation
 
-Because it contains several auto-configurations, creating your own instance is quite easy,
-actually you could get started using Spring Initializr itself to generate a starting point!
+Because it contains several auto-configurations, creating your own instance is quite easy.
+You could get started using Spring Initializr itself to generate a starting point!
 
 Create a new project with the `web` dependency and add the following dependency:
 
@@ -33,6 +104,11 @@ Create a new project with the `web` dependency and add the following dependency:
 		<artifactId>initializr-web</artifactId>
 		<version>{spring-initializr-version}</version>
 	</dependency>
+	<dependency>
+		<groupId>io.spring.initializr</groupId>
+		<artifactId>initializr-generator-spring</artifactId>
+		<version>{spring-initializr-version}</version>
+	</dependency>
 ----
 
 Or if you are using Gradle:
@@ -40,6 +116,7 @@ Or if you are using Gradle:
 [source,groovy,indent=0,subs="verbatim,quotes,attributes"]
 ----
 implementation("io.spring.initializr:initializr-web:{spring-initializr-version}")
+implementation("io.spring.initializr:initializr-generator-spring:{spring-initializr-version}")
 ----
 
 NOTE: Spring Initializr releases are not available on Maven Central so you will need to
@@ -66,13 +143,13 @@ Most of the drop-down lists are configured via a simple list-based structure whe
 entry has an `id`, a `name` and whether that entry is the default or not. If no `name` is
 provided, the `id` is used instead.
 
-Let's configure the languages and the Java versions we want to support:
+Let's configure the languages and the JVM generations we want to support:
 
 [source,yaml,indent=0]
 ----
 	initializr:
 	  javaVersions:
-		- id: 9
+		- id: 11
 		  default: false
 		- id: 1.8
 		  default: true
@@ -88,8 +165,8 @@ Let's configure the languages and the Java versions we want to support:
 If you click on the "Switch to the full version" link, the two drop down lists now offer
 the options and default values defined above.
 
-Spring Initializr supports `java`, `groovy` and `kotlin` and additional languages can be
-added in your own customization.
+NOTE: The language identifiers defined there must have a corresponding `Language`
+implementation. `java`, `kotlin` and `groovy` can be used out-of-the-box.
 
 The available packagings are also configurable that way:
 
@@ -105,8 +182,7 @@ The available packagings are also configurable that way:
 		  default: false
 ----
 
-These two packaging types are the only one explicitly supported at the moment.
-
+NOTE: Additional packaging formats can be configured by implementing the `Packaging` abstraction.
 
 
 [[create-instance-boot-versions]]
@@ -124,18 +200,15 @@ details, {spring-boot-reference}/#boot-features-restclient-customization[check t
 documentation].
 
 If you don't want the version to be upgraded automatically, you need to override the
-`InitializrMetadataProvider` bean to provide your own metadata for the service. For
-instance, you could swap to an implementation that always returns the contents of static
-`application.yml`:
+`InitializrMetadataUpdateStrategy` bean to provide your own strategy when the metadata has
+to be refreshed. For instance, you could swap to an implementation that always returns the
+contents of static `application.yml`:
 
 [source,java,indent=0]
 ----
 	@Bean
-	public InitializrMetadataProvider initializrMetadataProvider(
-			InitializrProperties properties) {
-		InitializrMetadata metadata = InitializrMetadataBuilder
-				.fromInitializrProperties(properties).build();
-		return new SimpleInitializrMetadataProvider(metadata);
+	public InitializrMetadataUpdateStrategy initializrMetadataUpdateStrategy() {
+		return (metadata) -> metadata;
 	}
 ----
 
@@ -159,15 +232,14 @@ By default, Spring Initializr exposes the following resources (all accessed via 
 * `/starter.zip` generate a complete project structure archived in a zip
 * `/starter.tgz` generate a complete project structure archived in a tgz
 
-Each type also defines one or more *tags* that provides additional metadata entries to
-qualify the entry. The following standard tags exist:
+The build system must be defined with a `build` tag providing the name of the
+`BuildSystem` to use (e.g. `maven`, `gradle`).
 
-* `build`: the name of the build system to use (e.g. `maven`, `gradle`)
-* `format`: the format of the project (e.g. `project` for a full project, `build` for just
-a build file).
-
-By default, the HTML UI filters all the available types to only display the ones that have
-a `format` tag with value `project`.
+Additional tags can be provided to further qualify the entry. Besides the mandatory `build`
+tag, a `format` tag is also available to define the format of the project (e.g. `project`
+for a full project, `build` for just a build file). By default, the HTML UI filters all
+the available types to only display the ones that have a `format` tag with value
+`project`.
 
 You can of course implement additional endpoints that generate whatever project structure
 you need but, for now, we'll simply configure our instance to generate a Gradle or a Maven
@@ -347,27 +419,27 @@ declared at the top level (under `env`) and given an id via the key in the confi
 
 [source,yaml,indent=0]
 ----
-initializr:
-  env:
-    repositories:
-      my-api-repo-1:
-        name: repo1
-        url: http://example.com/repo1
+	initializr:
+	  env:
+		repositories:
+		  my-api-repo-1:
+			name: repo1
+			url: http://example.com/repo1
 ----
 
 Once defined, the repository can then be referred back to in a dependency
 
 [source,yaml,indent=0]
 ----
-initializr:
-  dependencies:
-    - name: Other
-      content:
-        - name: Foo
-          groupId: org.acme
-          artifactId: foo
-          version: 1.3.5
-          repository: my-api-repo-1
+	initializr:
+	  dependencies:
+		- name: Other
+		  content:
+			- name: Foo
+			  groupId: org.acme
+			  artifactId: foo
+			  version: 1.3.5
+			  repository: my-api-repo-1
 ----
 
 It is usually preferable to have a BOM for every dependency, and attach the repository to
@@ -394,14 +466,14 @@ configuration key. Example:
 
 [source,yaml,indent=0]
 ----
-initializr:
-  env:
-    boms:
-      my-api-bom:
-        groupId: org.acme
-        artifactId: my-api-dependencies
-        version: 1.0.0.RELEASE
-        repositories: my-api-repo-1
+	initializr:
+	  env:
+		boms:
+		  my-api-bom:
+			groupId: org.acme
+			artifactId: my-api-dependencies
+			version: 1.0.0.RELEASE
+			repositories: my-api-repo-1
 ----
 
 If a BOM requires a special, non-default repository, then it can be referred to here,
@@ -411,15 +483,15 @@ BOMs by referring to the id:
 
 [source,yaml,indent=0]
 ----
-initializr:
-  dependencies:
-    - name: Other
-      content:
-        - name: My API
-          id : my-api
-          groupId: org.acme
-          artifactId: my-api
-          bom: my-api-bom
+	initializr:
+	  dependencies:
+		- name: Other
+		  content:
+			- name: My API
+			  id : my-api
+			  groupId: org.acme
+			  artifactId: my-api
+			  bom: my-api-bom
 ----
 
 
@@ -437,27 +509,27 @@ Here's an example of a BOM with mappings:
 
 [source,yaml,indent=0]
 ----
-initializr:
-  env:
-    boms:
-      cloud-bom:
-        groupId: com.example.foo
-        artifactId: acme-foo-dependencies
-        mappings:
-          - versionRange: "[1.2.3.RELEASE,1.3.0.RELEASE)"
-            groupId: com.example.bar
-            artifactId: acme-foo-bom
-            version: Arcturus.SR6
-          - versionRange: "[1.3.0.RELEASE,1.4.0.RELEASE)"
-            version: Botein.SR7
-          - versionRange: "[1.4.0.RELEASE,1.5.x.RELEASE)"
-            version: Castor.SR6
-          - versionRange: "[1.5.0.RELEASE,1.5.x.BUILD-SNAPSHOT)"
-            version: Diadem.RC1
-            repositories: spring-milestones
-          - versionRange: "1.5.x.BUILD-SNAPSHOT"
-            version: Diadem.BUILD-SNAPSHOT
-            repositories: spring-snapshots,spring-milestones
+	initializr:
+	  env:
+		boms:
+		  cloud-bom:
+			groupId: com.example.foo
+			artifactId: acme-foo-dependencies
+			mappings:
+			  - versionRange: "[1.2.3.RELEASE,1.3.0.RELEASE)"
+				groupId: com.example.bar
+				artifactId: acme-foo-bom
+				version: Arcturus.SR6
+			  - versionRange: "[1.3.0.RELEASE,1.4.0.RELEASE)"
+				version: Botein.SR7
+			  - versionRange: "[1.4.0.RELEASE,1.5.x.RELEASE)"
+				version: Castor.SR6
+			  - versionRange: "[1.5.0.RELEASE,1.5.x.BUILD-SNAPSHOT)"
+				version: Diadem.RC1
+				repositories: spring-milestones
+			  - versionRange: "1.5.x.BUILD-SNAPSHOT"
+				version: Diadem.BUILD-SNAPSHOT
+				repositories: spring-snapshots,spring-milestones
 ----
 
 The primary use case here is to map Spring Boot versions to the preferred or supported
@@ -481,14 +553,14 @@ an alias can be defined for ths dependency;
 
 [source,yaml,indent=0]
 ----
-initializr:
-  dependencies:
-    - name: Other
-      content:
-        - name: Web Services
-          id: web-services
-          aliases:
-            - ws
+	initializr:
+	  dependencies:
+		- name: Other
+		  content:
+			- name: Web Services
+			  id: web-services
+			  aliases:
+				- ws
 ----
 
 The same project can now be generated with `dependencies=ws` or
@@ -499,11 +571,10 @@ The same project can now be generated with `dependencies=ws` or
 [[dependencies-facet]]
 ==== Facets
 A "facet" is a label on a dependency which is used to drive a code modification in the
-generated project. In the standard Initializr generator, there is only one facet that is
-actually used (`web`), but custom installations might choose to use it for their own
-purposes. The `web` facet is used to drive the inclusion of a dependency with id `web`
-(defaulting to `spring-boot-starter-web` if such dependency is not present) when any other
-dependency with that facet is included.
+generated project. For example, `initializr-generator-spring` checks for the presence of a
+dependency with the `web` facet if the packaging type is `war`. The absence of a dependency
+with the `web` facet drives inclusion of a dependency with id `web` (defaulting to
+`spring-boot-starter-web` if such dependency is not available).
 
 The value of the "facets" property of a dependency is a list of strings.
 
@@ -626,18 +697,18 @@ versions of Spring Boot, not of your dependency. For example:
 
 [source,yaml,indent=0]
 ----
-initializr:
-  dependencies:
-    - name: Stuff
-      content:
-        - name: Foo
-          id: foo
-          ...
-          versionRange: 1.2.0.M1
-        - name: Bar
-          id: bar
-          ...
-          versionRange: "[1.5.0.RC1,2.0.0.M1)"
+	initializr:
+	  dependencies:
+		- name: Stuff
+		  content:
+			- name: Foo
+			  id: foo
+			  ...
+			  versionRange: 1.2.0.M1
+			- name: Bar
+			  id: bar
+			  ...
+			  versionRange: "[1.5.0.RC1,2.0.0.M1)"
 ----
 
 In this example `Foo` is available for Spring Boot 1.2.0 (or any milestone of 1.2.0) or
@@ -650,20 +721,20 @@ the values defined at the top level. For example:
 
 [source,yaml,indent=0]
 ----
-initializr:
-  dependencies:
-    - name: Stuff
-      content:
-        - name: Foo
-          id: foo
-          groupId: org.acme.foo
-          artifactId: foo-spring-boot-starter
-          versionRange: 1.3.0.RELEASE
-          bom: cloud-task-bom
-          mappings:
-            - versionRange: "[1.3.0.RELEASE,1.3.x.RELEASE]"
-              artifactId: foo-starter
-            - versionRange: "1.4.0.RELEASE"
+	initializr:
+	  dependencies:
+		- name: Stuff
+		  content:
+			- name: Foo
+			  id: foo
+			  groupId: org.acme.foo
+			  artifactId: foo-spring-boot-starter
+			  versionRange: 1.3.0.RELEASE
+			  bom: cloud-task-bom
+			  mappings:
+				- versionRange: "[1.3.0.RELEASE,1.3.x.RELEASE]"
+				  artifactId: foo-starter
+				- versionRange: "1.4.0.RELEASE"
 ----
 
 In this example, The artifact of `foo` was changed to `foo-spring-boot-starter` as of the
@@ -674,20 +745,20 @@ A mapping can also be applied to a BOM declaration. For example:
 
 [source,yaml,indent=0]
 ----
-initializr:
-  env:
-    boms:
-      my-api-bom:
-        groupId: org.acme
-        artifactId: my-api-bom
-        additionalBoms: ['my-api-dependencies-bom']
-        mappings:
-          - versionRange: "[1.0.0.RELEASE,1.1.6.RELEASE)"
-            version: 1.0.0.RELEASE
-            repositories: my-api-repo-1
-          - versionRange: "1.2.1.RELEASE"
-            version: 2.0.0.RELEASE
-            repositories: my-api-repo-2
+	initializr:
+	  env:
+		boms:
+		  my-api-bom:
+			groupId: org.acme
+			artifactId: my-api-bom
+			additionalBoms: ['my-api-dependencies-bom']
+			mappings:
+			  - versionRange: "[1.0.0.RELEASE,1.1.6.RELEASE)"
+				version: 1.0.0.RELEASE
+				repositories: my-api-repo-1
+			  - versionRange: "1.2.1.RELEASE"
+				version: 2.0.0.RELEASE
+				repositories: my-api-repo-2
 ----
 
 In this example Spring Boot versions up to 1.1.6 select version 1.0.0 of the BOM, and set
@@ -713,15 +784,15 @@ existing Spring Boot starter) you can flag it as a "non starter":
 
 [source,yaml,indent=0]
 ----
-initializr:
-  dependencies:
-    - name: Stuff
-      content:
-        - name: Lib
-          id: lib
-          groupId: com.acme
-          artifactId: lib
-          starter:false
+	initializr:
+	  dependencies:
+		- name: Stuff
+		  content:
+			- name: Lib
+			  id: lib
+			  groupId: com.acme
+			  artifactId: lib
+			  starter:false
 ----
 
 When a project is generated that only has dependencies with this flag set, then the base
@@ -738,13 +809,13 @@ common settings in a group are the `groupId`, `versionRange` and `bom`:
 
 [source,yaml,indent=0]
 ----
-initializr:
-  dependencies:
-    - name: Stuff
-      bom: stuff-bom
-      versionRange: "[1.3.0.RELEASE,2.0.0.M1)"
-      content:
-...
+	initializr:
+	  dependencies:
+		- name: Stuff
+		  bom: stuff-bom
+		  versionRange: "[1.3.0.RELEASE,2.0.0.M1)"
+		  content:
+	...
 ----
 
 These dependencies, by default, will be available only for Spring Boot versions 1.3 up to
@@ -805,7 +876,7 @@ expiration settings accordingly.
 |`initializr.dependency-metadata`
 |Cache dependency-specific metadata.
 
-|`initializr.project-resources`
-|Cache resources that are used to generate projects.
+|`initializr.templates`
+|Cache templates that are used to generate projects.
 
 |===

@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,33 +25,30 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import javax.servlet.http.HttpServletRequest;
-
-import com.samskivert.mustache.Mustache;
-import io.spring.initializr.generator.BasicProjectRequest;
-import io.spring.initializr.generator.CommandLineHelpGenerator;
-import io.spring.initializr.generator.ProjectGenerator;
-import io.spring.initializr.generator.ProjectRequest;
+import io.spring.initializr.generator.buildsystem.BuildSystem;
+import io.spring.initializr.generator.buildsystem.maven.MavenBuildSystem;
+import io.spring.initializr.generator.io.template.TemplateRenderer;
+import io.spring.initializr.generator.project.ResolvedProjectDescription;
+import io.spring.initializr.generator.version.Version;
 import io.spring.initializr.metadata.DependencyMetadata;
 import io.spring.initializr.metadata.DependencyMetadataProvider;
 import io.spring.initializr.metadata.InitializrMetadata;
 import io.spring.initializr.metadata.InitializrMetadataProvider;
-import io.spring.initializr.util.Agent;
-import io.spring.initializr.util.Agent.AgentId;
-import io.spring.initializr.util.TemplateRenderer;
-import io.spring.initializr.util.Version;
 import io.spring.initializr.web.mapper.DependencyMetadataV21JsonMapper;
 import io.spring.initializr.web.mapper.InitializrMetadataJsonMapper;
 import io.spring.initializr.web.mapper.InitializrMetadataV21JsonMapper;
 import io.spring.initializr.web.mapper.InitializrMetadataV2JsonMapper;
 import io.spring.initializr.web.mapper.InitializrMetadataVersion;
+import io.spring.initializr.web.support.Agent;
+import io.spring.initializr.web.support.Agent.AgentId;
+import io.spring.initializr.web.support.CommandLineHelpGenerator;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.taskdefs.Tar;
 import org.apache.tools.ant.taskdefs.Zip;
 import org.apache.tools.ant.types.TarFileSet;
 import org.apache.tools.ant.types.ZipFileSet;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
@@ -61,13 +58,12 @@ import org.springframework.http.ResponseEntity.BodyBuilder;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.DigestUtils;
 import org.springframework.util.StreamUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.servlet.resource.ResourceUrlProvider;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * The main initializr controller provides access to the configured metadata and serves as
@@ -79,7 +75,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @Controller
 public class MainController extends AbstractInitializrController {
 
-	private static final Logger log = LoggerFactory.getLogger(MainController.class);
+	private static final Log logger = LogFactory.getLog(MainController.class);
 
 	/**
 	 * HAL JSON content type.
@@ -87,26 +83,25 @@ public class MainController extends AbstractInitializrController {
 	public static final MediaType HAL_JSON_CONTENT_TYPE = MediaType
 			.parseMediaType("application/hal+json");
 
-	private final ProjectGenerator projectGenerator;
-
 	private final DependencyMetadataProvider dependencyMetadataProvider;
 
 	private final CommandLineHelpGenerator commandLineHelpGenerator;
 
+	private final ProjectGenerationInvoker projectGenerationInvoker;
+
 	public MainController(InitializrMetadataProvider metadataProvider,
-			TemplateRenderer templateRenderer, ResourceUrlProvider resourceUrlProvider,
-			ProjectGenerator projectGenerator,
-			DependencyMetadataProvider dependencyMetadataProvider) {
-		super(metadataProvider, resourceUrlProvider);
-		this.projectGenerator = projectGenerator;
+			TemplateRenderer templateRenderer,
+			DependencyMetadataProvider dependencyMetadataProvider,
+			ProjectGenerationInvoker projectGenerationInvoker) {
+		super(metadataProvider);
 		this.dependencyMetadataProvider = dependencyMetadataProvider;
 		this.commandLineHelpGenerator = new CommandLineHelpGenerator(templateRenderer);
+		this.projectGenerationInvoker = projectGenerationInvoker;
 	}
 
 	@ModelAttribute
-	public BasicProjectRequest projectRequest(
-			@RequestHeader Map<String, String> headers) {
-		ProjectRequest request = new ProjectRequest();
+	public ProjectRequest projectRequest(@RequestHeader Map<String, String> headers) {
+		WebProjectRequest request = new WebProjectRequest();
 		request.getParameters().putAll(headers);
 		request.initialize(this.metadataProvider.get());
 		return request;
@@ -125,7 +120,9 @@ public class MainController extends AbstractInitializrController {
 
 	@RequestMapping(path = "/", produces = "text/plain")
 	public ResponseEntity<String> serviceCapabilitiesText(
-			@RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
+			@RequestHeader(value = HttpHeaders.USER_AGENT,
+					required = false) String userAgent)
+			throws IOException {
 		String appUrl = generateAppUrl();
 		InitializrMetadata metadata = this.metadataProvider.get();
 
@@ -161,8 +158,8 @@ public class MainController extends AbstractInitializrController {
 				HAL_JSON_CONTENT_TYPE);
 	}
 
-	@RequestMapping(path = "/", produces = { "application/vnd.initializr.v2.1+json",
-			"application/json" })
+	@RequestMapping(path = "/",
+			produces = { "application/vnd.initializr.v2.1+json", "application/json" })
 	public ResponseEntity<String> serviceCapabilitiesV21() {
 		return serviceCapabilitiesFor(InitializrMetadataVersion.V2_1);
 	}
@@ -196,8 +193,8 @@ public class MainController extends AbstractInitializrController {
 		}
 	}
 
-	@RequestMapping(path = "/dependencies", produces = {
-			"application/vnd.initializr.v2.1+json", "application/json" })
+	@RequestMapping(path = "/dependencies",
+			produces = { "application/vnd.initializr.v2.1+json", "application/json" })
 	public ResponseEntity<String> dependenciesV21(
 			@RequestParam(required = false) String bootVersion) {
 		return dependenciesFor(InitializrMetadataVersion.V2_1, bootVersion);
@@ -216,22 +213,6 @@ public class MainController extends AbstractInitializrController {
 				.cacheControl(CacheControl.maxAge(7, TimeUnit.DAYS)).body(content);
 	}
 
-	@ModelAttribute("linkTo")
-	public Mustache.Lambda linkTo() {
-		return (frag, out) -> out.write(this.getLinkTo().apply(frag.execute()));
-	}
-
-	@RequestMapping(path = "/", produces = "text/html")
-	public String home(HttpServletRequest request, Map<String, Object> model) {
-		if (isForceSsl() && !request.isSecure()) {
-			String securedUrl = ServletUriComponentsBuilder.fromCurrentRequest()
-					.scheme("https").build().toUriString();
-			return "redirect:" + securedUrl;
-		}
-		renderHome(model);
-		return "home";
-	}
-
 	@RequestMapping(path = { "/spring", "/spring.zip" })
 	public String spring() {
 		String url = this.metadataProvider.get().createCliDistributionURl("zip");
@@ -246,34 +227,29 @@ public class MainController extends AbstractInitializrController {
 
 	@RequestMapping(path = { "/pom", "/pom.xml" })
 	@ResponseBody
-	public ResponseEntity<byte[]> pom(BasicProjectRequest request) {
+	public ResponseEntity<byte[]> pom(ProjectRequest request) {
 		request.setType("maven-build");
-		byte[] mavenPom = this.projectGenerator
-				.generateMavenPom((ProjectRequest) request);
+		byte[] mavenPom = this.projectGenerationInvoker.invokeBuildGeneration(request);
 		return createResponseEntity(mavenPom, "application/octet-stream", "pom.xml");
 	}
 
 	@RequestMapping(path = { "/build", "/build.gradle" })
 	@ResponseBody
-	public ResponseEntity<byte[]> gradle(BasicProjectRequest request) {
+	public ResponseEntity<byte[]> gradle(ProjectRequest request) {
 		request.setType("gradle-build");
-		byte[] gradleBuild = this.projectGenerator
-				.generateGradleBuild((ProjectRequest) request);
+		byte[] gradleBuild = this.projectGenerationInvoker.invokeBuildGeneration(request);
 		return createResponseEntity(gradleBuild, "application/octet-stream",
 				"build.gradle");
 	}
 
 	@RequestMapping("/starter.zip")
 	@ResponseBody
-	public ResponseEntity<byte[]> springZip(BasicProjectRequest basicRequest)
-			throws IOException {
-		ProjectRequest request = (ProjectRequest) basicRequest;
-		File dir = this.projectGenerator.generateProjectStructure(request);
-
-		File download = this.projectGenerator.createDistributionFile(dir, ".zip");
-
-		String wrapperScript = getWrapperScript(request);
-		new File(dir, wrapperScript).setExecutable(true);
+	public ResponseEntity<byte[]> springZip(ProjectRequest request) throws IOException {
+		ProjectGenerationResult result = this.projectGenerationInvoker
+				.invokeProjectStructureGeneration(request);
+		File dir = result.getRootDirectory().toFile();
+		File download = this.projectGenerationInvoker.createDistributionFile(dir, ".zip");
+		String wrapperScript = getWrapperScript(result.getProjectDescription());
 		Zip zip = new Zip();
 		zip.setProject(new Project());
 		zip.setDefaultexcludes(false);
@@ -296,15 +272,13 @@ public class MainController extends AbstractInitializrController {
 
 	@RequestMapping(path = "/starter.tgz", produces = "application/x-compress")
 	@ResponseBody
-	public ResponseEntity<byte[]> springTgz(BasicProjectRequest basicRequest)
-			throws IOException {
-		ProjectRequest request = (ProjectRequest) basicRequest;
-		File dir = this.projectGenerator.generateProjectStructure(request);
-
-		File download = this.projectGenerator.createDistributionFile(dir, ".tar.gz");
-
-		String wrapperScript = getWrapperScript(request);
-		new File(dir, wrapperScript).setExecutable(true);
+	public ResponseEntity<byte[]> springTgz(ProjectRequest request) throws IOException {
+		ProjectGenerationResult result = this.projectGenerationInvoker
+				.invokeProjectStructureGeneration(request);
+		File dir = result.getRootDirectory().toFile();
+		File download = this.projectGenerationInvoker.createDistributionFile(dir,
+				".tar.gz");
+		String wrapperScript = getWrapperScript(result.getProjectDescription());
 		Tar zip = new Tar();
 		zip.setProject(new Project());
 		zip.setDefaultexcludes(false);
@@ -327,8 +301,11 @@ public class MainController extends AbstractInitializrController {
 				"application/x-compress");
 	}
 
-	private static String generateFileName(ProjectRequest request, String extension) {
-		String tmp = request.getArtifactId().replaceAll(" ", "_");
+	private String generateFileName(ProjectRequest request, String extension) {
+		String candidate = (StringUtils.hasText(request.getArtifactId())
+				? request.getArtifactId()
+				: this.metadataProvider.get().getArtifactId().getContent());
+		String tmp = candidate.replaceAll(" ", "_");
 		try {
 			return URLEncoder.encode(tmp, "UTF-8") + "." + extension;
 		}
@@ -337,19 +314,20 @@ public class MainController extends AbstractInitializrController {
 		}
 	}
 
-	private static String getWrapperScript(ProjectRequest request) {
-		String script = ("gradle".equals(request.getBuild()) ? "gradlew" : "mvnw");
-		return (request.getBaseDir() != null) ? request.getBaseDir() + "/" + script
-				: script;
+	private static String getWrapperScript(ResolvedProjectDescription description) {
+		BuildSystem buildSystem = description.getBuildSystem();
+		String script = buildSystem.id().equals(MavenBuildSystem.ID) ? "mvnw" : "gradlew";
+		return (description.getBaseDirectory() != null)
+				? description.getBaseDirectory() + "/" + script : script;
 	}
 
 	private ResponseEntity<byte[]> upload(File download, File dir, String fileName,
 			String contentType) throws IOException {
 		byte[] bytes = StreamUtils.copyToByteArray(new FileInputStream(download));
-		log.info("Uploading: {} ({} bytes)", download, bytes.length);
+		logger.info(String.format("Uploading: %s (%s bytes)", download, bytes.length));
 		ResponseEntity<byte[]> result = createResponseEntity(bytes, contentType,
 				fileName);
-		this.projectGenerator.cleanTempFiles(dir);
+		this.projectGenerationInvoker.cleanTempFiles(dir);
 		return result;
 	}
 

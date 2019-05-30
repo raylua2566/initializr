@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,7 @@
 
 package io.spring.initializr.web.project;
 
-import io.spring.initializr.test.generator.PomAssert;
+import io.spring.initializr.generator.spring.test.build.PomAssert;
 import io.spring.initializr.web.AbstractInitializrControllerIntegrationTests;
 import org.junit.jupiter.api.Test;
 
@@ -26,17 +26,17 @@ import org.springframework.test.context.ActiveProfiles;
 /**
  * Validate that the "raw" HTTP commands that are described in the command-line help
  * works. If anything needs to be updated here, please double check the
- * "curl-examples.txt" as it may need an update as well. This is also a good indicator of
- * a non backward compatible change.
+ * "cli/curl-examples.mustache" as it may need an update as well. This is also a good
+ * indicator of a non backward compatible change.
  *
  * @author Stephane Nicoll
  */
 @ActiveProfiles("test-default")
-public class CommandLineExampleIntegrationTests
+class CommandLineExampleIntegrationTests
 		extends AbstractInitializrControllerIntegrationTests {
 
 	@Test
-	public void generateDefaultProject() {
+	void generateDefaultProject() {
 		downloadZip("/starter.zip").isJavaProject().isMavenProject()
 				.hasStaticAndTemplatesResources(false).pomAssert()
 				.hasSpringBootStarterRootDependency().hasSpringBootStarterTest()
@@ -44,7 +44,7 @@ public class CommandLineExampleIntegrationTests
 	}
 
 	@Test
-	public void generateWebProjectWithJava8() {
+	void generateWebProjectWithJava8() {
 		downloadZip("/starter.zip?dependencies=web&javaVersion=1.8").isJavaProject()
 				.isMavenProject().hasStaticAndTemplatesResources(true).pomAssert()
 				.hasJavaVersion("1.8").hasSpringBootStarterDependency("web")
@@ -52,7 +52,7 @@ public class CommandLineExampleIntegrationTests
 	}
 
 	@Test
-	public void generateWebDataJpaGradleProject() {
+	void generateWebDataJpaGradleProject() {
 		downloadTgz(
 				"/starter.tgz?dependencies=web,data-jpa&type=gradle-project&baseDir=my-dir")
 						.hasBaseDir("my-dir").isJavaProject().isGradleProject()
@@ -62,7 +62,7 @@ public class CommandLineExampleIntegrationTests
 	}
 
 	@Test
-	public void generateMavenPomWithWarPackaging() {
+	void generateMavenPomWithWarPackaging() {
 		ResponseEntity<String> response = getRestTemplate()
 				.getForEntity(createUrl("/pom.xml?packaging=war"), String.class);
 		PomAssert pomAssert = new PomAssert(response.getBody());
