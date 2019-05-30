@@ -54,7 +54,6 @@
 		<module>initializr-metadata</module>
 		<module>initializr-service-sample</module>
 		<module>initializr-web</module>
-		<module>initializr-server</module>
 		<module>initializr-docs</module>
 	</modules>
 
@@ -206,30 +205,30 @@
 					</execution>
 				</executions>
 			</plugin>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>flatten-maven-plugin</artifactId>
-				<inherited>true</inherited>
-				<executions>
-					<execution>
-						<!-- Tidy up all POMs before they are published -->
-						<id>flatten</id>
-						<phase>process-resources</phase>
-						<goals>
-							<goal>flatten</goal>
-						</goals>
-						<configuration>
-							<updatePomFile>true</updatePomFile>
-							<flattenMode>oss</flattenMode>
-							<pomElements>
-								<parent>expand</parent>
-								<distributionManagement>remove</distributionManagement>
-								<repositories>remove</repositories>
-							</pomElements>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
+<!--			<plugin>-->
+<!--				<groupId>org.codehaus.mojo</groupId>-->
+<!--				<artifactId>flatten-maven-plugin</artifactId>-->
+<!--				<inherited>true</inherited>-->
+<!--				<executions>-->
+<!--					<execution>-->
+<!--						&lt;!&ndash; Tidy up all POMs before they are published &ndash;&gt;-->
+<!--						<id>flatten</id>-->
+<!--						<phase>process-resources</phase>-->
+<!--						<goals>-->
+<!--							<goal>flatten</goal>-->
+<!--						</goals>-->
+<!--						<configuration>-->
+<!--							<updatePomFile>true</updatePomFile>-->
+<!--							<flattenMode>oss</flattenMode>-->
+<!--							<pomElements>-->
+<!--								<parent>expand</parent>-->
+<!--								<distributionManagement>remove</distributionManagement>-->
+<!--								<repositories>remove</repositories>-->
+<!--							</pomElements>-->
+<!--						</configuration>-->
+<!--					</execution>-->
+<!--				</executions>-->
+<!--			</plugin>-->
 		</plugins>
 		<pluginManagement>
 			<plugins>
