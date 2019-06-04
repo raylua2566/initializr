@@ -14,19 +14,27 @@
  * limitations under the License.
  */
 
-package io.spring.initializr.generator.language.java;
+package io.spring.initializr.generator.spring.configuration;
 
-import io.spring.initializr.generator.io.IndentingWriter;
+import java.util.Properties;
+
+import org.springframework.core.Ordered;
 
 /**
- * A Java expression.
+ * Callback for customizing the `application.properties` test source code. Invoked with an
+ * {@link Ordered order} of {@code 0} by default, considering overriding
+ * {@link #getOrder()} to customize this behaviour.
  *
- * @author Andy Wilkinson
+ * @author Ray Lau
  */
-public class JavaExpression {
+@FunctionalInterface
+public interface ApplicationPropertiesCustomizer extends Ordered {
 
-	public void write(IndentingWriter writer) {
+	void customize(Properties properties);
 
+	@Override
+	default int getOrder() {
+		return 0;
 	}
 
 }

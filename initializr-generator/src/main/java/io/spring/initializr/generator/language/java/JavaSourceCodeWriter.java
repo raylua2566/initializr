@@ -185,7 +185,11 @@ public class JavaSourceCodeWriter implements SourceCodeWriter<JavaSourceCode> {
 							+ " " + parameter.getName())
 					.collect(Collectors.joining(", ")));
 		}
-		writer.println(") {");
+
+		writer.print(") ");
+		writeMethodDeclarationThrows(writer, methodDeclaration);
+		writer.println("{");
+
 		writer.indented(() -> {
 			List<JavaStatement> statements = methodDeclaration.getStatements();
 			for (JavaStatement statement : statements) {
@@ -205,6 +209,18 @@ public class JavaSourceCodeWriter implements SourceCodeWriter<JavaSourceCode> {
 		writer.println();
 	}
 
+	private void writeMethodDeclarationThrows(IndentingWriter writer,
+			JavaMethodDeclaration methodDeclaration) {
+		if (methodDeclaration.getThrows() != null
+				&& methodDeclaration.getThrows().size() > 0) {
+			writer.print("throws ");
+			writer.print(String.join(",", methodDeclaration.getThrows().stream()
+					.map(this::getUnqualifiedName).toArray(CharSequence[]::new)));
+			writer.print(" ");
+		}
+
+	}
+
 	private void writeModifiers(IndentingWriter writer,
 			Map<Predicate<Integer>, String> availableModifiers, int declaredModifiers) {
 		String modifiers = availableModifiers.entrySet().stream()
@@ -219,6 +235,9 @@ public class JavaSourceCodeWriter implements SourceCodeWriter<JavaSourceCode> {
 	private void writeExpression(IndentingWriter writer, JavaExpression expression) {
 		if (expression instanceof JavaMethodInvocation) {
 			writeMethodInvocation(writer, (JavaMethodInvocation) expression);
+		}
+		else if (expression != null) {
+			expression.write(writer);
 		}
 	}
 
@@ -266,6 +285,11 @@ public class JavaSourceCodeWriter implements SourceCodeWriter<JavaSourceCode> {
 								.map(JavaMethodInvocation.class::cast),
 						(methodInvocation) -> Collections
 								.singleton(methodInvocation.getTarget())));
+
+				if (methodDeclaration.getThrows() != null) {
+					imports.addAll(getRequiredImports(methodDeclaration.getThrows(),
+							Collections::singletonList));
+				}
 			}
 		}
 		Collections.sort(imports);

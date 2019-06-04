@@ -16,7 +16,20 @@
 
 package io.spring.initializr.generator.spring.configuration;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Properties;
+import java.util.stream.Collectors;
+
 import io.spring.initializr.generator.project.contributor.SingleResourceProjectContributor;
+import io.spring.initializr.generator.spring.util.LambdaSafe;
+
+import org.springframework.beans.BeansException;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
 
 /**
  * A {@link SingleResourceProjectContributor} that contributes a
@@ -24,7 +37,10 @@ import io.spring.initializr.generator.project.contributor.SingleResourceProjectC
  *
  * @author Stephane Nicoll
  */
-public class ApplicationPropertiesContributor extends SingleResourceProjectContributor {
+public class ApplicationPropertiesContributor extends SingleResourceProjectContributor
+		implements ApplicationContextAware {
+
+	private ApplicationContext applicationContext;
 
 	public ApplicationPropertiesContributor() {
 		this("classpath:configuration/application.properties");
@@ -32,6 +48,35 @@ public class ApplicationPropertiesContributor extends SingleResourceProjectContr
 
 	public ApplicationPropertiesContributor(String resourcePattern) {
 		super("src/main/resources/application.properties", resourcePattern);
+	}
+
+	@Override
+	public void setApplicationContext(ApplicationContext applicationContext)
+			throws BeansException {
+		this.applicationContext = applicationContext;
+	}
+
+	@Override
+	@SuppressWarnings("unchecked")
+	public void contributeFile(Path resourceFile) throws IOException {
+		if (this.applicationContext == null) {
+			return;
+		}
+
+		Properties properties = new Properties();
+		try (InputStream inStream = Files.newInputStream(resourceFile)) {
+			properties.load(inStream);
+		}
+
+		List<ApplicationPropertiesCustomizer> customizers = this.applicationContext
+				.getBeanProvider(ApplicationPropertiesCustomizer.class).orderedStream()
+				.collect(Collectors.toList());
+
+		LambdaSafe
+				.callbacks(ApplicationPropertiesCustomizer.class, customizers, properties)
+				.invoke((customizer) -> customizer.customize(properties));
+
+		properties.store(Files.newOutputStream(resourceFile), null);
 	}
 
 }

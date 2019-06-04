@@ -98,12 +98,13 @@ class JavaSourceCodeWriterTests {
 		test.addMethodDeclaration(JavaMethodDeclaration.method("trim")
 				.returning("java.lang.String").modifiers(Modifier.PUBLIC)
 				.parameters(new Parameter("java.lang.String", "value"))
-				.body(new JavaReturnStatement(
+				.throwz("java.io.IOException").body(new JavaReturnStatement(
 						new JavaMethodInvocation("value", "trim"))));
 		List<String> lines = writeSingleType(sourceCode, "com/example/Test.java");
-		assertThat(lines).containsExactly("package com.example;", "", "class Test {", "",
-				"    public String trim(String value) {", "        return value.trim();",
-				"    }", "", "}");
+		assertThat(lines).containsExactly("package com.example;", "",
+				"import java.io.IOException;", "", "class Test {", "",
+				"    public String trim(String value) throws IOException {",
+				"        return value.trim();", "    }", "", "}");
 	}
 
 	@Test

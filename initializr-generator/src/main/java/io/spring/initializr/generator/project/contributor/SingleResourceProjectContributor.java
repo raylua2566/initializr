@@ -32,7 +32,7 @@ import org.springframework.util.FileCopyUtils;
  * @author Andy Wilkinson
  * @see PathMatchingResourcePatternResolver
  */
-public class SingleResourceProjectContributor implements ProjectContributor {
+public abstract class SingleResourceProjectContributor implements ProjectContributor {
 
 	private final PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
 
@@ -55,6 +55,10 @@ public class SingleResourceProjectContributor implements ProjectContributor {
 		Resource resource = this.resolver.getResource(this.resourcePattern);
 		FileCopyUtils.copy(resource.getInputStream(),
 				Files.newOutputStream(output, StandardOpenOption.APPEND));
+
+		contributeFile(output);
 	}
+
+	public abstract void contributeFile(Path resourceFile) throws IOException;
 
 }

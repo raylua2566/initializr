@@ -44,13 +44,17 @@ public final class JavaMethodDeclaration implements Annotatable {
 
 	private final List<JavaStatement> statements;
 
+	private List<String> _throwz;
+
 	private JavaMethodDeclaration(String name, String returnType, int modifiers,
-			List<Parameter> parameters, List<JavaStatement> statements) {
+			List<Parameter> parameters, List<JavaStatement> statements,
+			List<String> _throwz) {
 		this.name = name;
 		this.returnType = returnType;
 		this.modifiers = modifiers;
 		this.parameters = parameters;
 		this.statements = statements;
+		this._throwz = _throwz;
 	}
 
 	public static Builder method(String name) {
@@ -87,6 +91,10 @@ public final class JavaMethodDeclaration implements Annotatable {
 		return Collections.unmodifiableList(this.annotations);
 	}
 
+	public List<String> getThrows() {
+		return this._throwz;
+	}
+
 	/**
 	 * Builder for creating a {@link JavaMethodDeclaration}.
 	 */
@@ -99,6 +107,8 @@ public final class JavaMethodDeclaration implements Annotatable {
 		private String returnType = "void";
 
 		private int modifiers;
+
+		private List<String> _throwz;
 
 		private Builder(String name) {
 			this.name = name;
@@ -119,9 +129,14 @@ public final class JavaMethodDeclaration implements Annotatable {
 			return this;
 		}
 
+		public Builder throwz(String... exceptionType) {
+			this._throwz = Arrays.asList(exceptionType);
+			return this;
+		}
+
 		public JavaMethodDeclaration body(JavaStatement... statements) {
 			return new JavaMethodDeclaration(this.name, this.returnType, this.modifiers,
-					this.parameters, Arrays.asList(statements));
+					this.parameters, Arrays.asList(statements), this._throwz);
 		}
 
 	}
