@@ -85,18 +85,8 @@ public abstract class GradleBuildWriter {
 	protected abstract void writeJavaSourceCompatibility(IndentingWriter writer,
 			GradleBuild build);
 
-	private void writeConfigurations(IndentingWriter writer, GradleBuild build) {
-		Map<String, ConfigurationCustomization> configurationCustomizations = build
-				.getConfigurationCustomizations();
-		if (configurationCustomizations.isEmpty()) {
-			return;
-		}
-		writer.println("configurations {");
-		writer.indented(() -> configurationCustomizations.forEach((name,
-				customization) -> writeConfiguration(writer, name, customization)));
-		writer.println("}");
-		writer.println("");
-	}
+	protected abstract void writeConfigurations(IndentingWriter writer,
+			GradleBuild build);
 
 	protected abstract void writeConfiguration(IndentingWriter writer,
 			String configurationName,
@@ -157,7 +147,14 @@ public abstract class GradleBuildWriter {
 	protected abstract void writeDependency(IndentingWriter writer,
 			Dependency dependency);
 
-	protected String configurationForScope(DependencyScope type) {
+	protected String configurationForDependency(Dependency dependency) {
+		if (dependency instanceof GradleDependency) {
+			String configuration = ((GradleDependency) dependency).getConfiguration();
+			if (configuration != null) {
+				return configuration;
+			}
+		}
+		DependencyScope type = dependency.getScope();
 		switch (type) {
 		case ANNOTATION_PROCESSOR:
 			return "annotationProcessor";

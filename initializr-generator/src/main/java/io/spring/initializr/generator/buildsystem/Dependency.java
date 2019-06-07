@@ -45,7 +45,7 @@ public class Dependency {
 
 	private final Set<Exclusion> exclusions;
 
-	Dependency(Builder builder) {
+	protected Dependency(Builder<?> builder) {
 		this.groupId = builder.groupId;
 		this.artifactId = builder.artifactId;
 		this.version = builder.version;
@@ -54,8 +54,13 @@ public class Dependency {
 		this.exclusions = new LinkedHashSet<>(builder.exclusions);
 	}
 
-	public static Builder withCoordinates(String groupId, String artifactId) {
+	public static Builder<?> withCoordinates(String groupId, String artifactId) {
 		return new Builder(groupId, artifactId);
+	}
+
+	public static Builder<?> from(Dependency dependency) {
+		return new Builder(dependency.getGroupId(), dependency.getArtifactId())
+				.initialize(dependency);
 	}
 
 	/**
@@ -111,9 +116,10 @@ public class Dependency {
 	/**
 	 * Builder for a dependency.
 	 *
+	 * @param <B> builder type
 	 * @see Dependency#withCoordinates(String, String)
 	 */
-	public static final class Builder {
+	public static class Builder<B extends Builder> {
 
 		private String groupId;
 
@@ -127,39 +133,56 @@ public class Dependency {
 
 		private Set<Exclusion> exclusions = new LinkedHashSet<>();
 
-		private Builder(String groupId, String artifactId) {
+		protected Builder(String groupId, String artifactId) {
 			this.groupId = groupId;
 			this.artifactId = artifactId;
 		}
 
-		public Builder groupId(String groupId) {
+		public B groupId(String groupId) {
 			this.groupId = groupId;
-			return this;
+			return self();
 		}
 
-		public Builder artifactId(String artifactId) {
+		public B artifactId(String artifactId) {
 			this.artifactId = artifactId;
-			return this;
+			return self();
 		}
 
-		public Builder version(VersionReference version) {
+		public B version(VersionReference version) {
 			this.version = version;
-			return this;
+			return self();
 		}
 
-		public Builder scope(DependencyScope scope) {
+		public B scope(DependencyScope scope) {
 			this.scope = scope;
-			return this;
+			return self();
 		}
 
-		public Builder type(String type) {
+		public B type(String type) {
 			this.type = type;
-			return this;
+			return self();
 		}
 
-		public Builder exclusions(Exclusion... exclusions) {
+		public B exclusions(Exclusion... exclusions) {
 			this.exclusions = new LinkedHashSet<>(Arrays.asList(exclusions));
-			return this;
+			return self();
+		}
+
+		public B exclusions(Set<Exclusion> exclusions) {
+			this.exclusions = (exclusions != null) ? new LinkedHashSet<>(exclusions)
+					: new LinkedHashSet<>();
+			return self();
+		}
+
+		@SuppressWarnings("unchecked")
+		protected B self() {
+			return (B) this;
+		}
+
+		protected B initialize(Dependency dependency) {
+			version(dependency.getVersion()).scope(dependency.getScope())
+					.type(dependency.getType()).exclusions(dependency.getExclusions());
+			return self();
 		}
 
 		public Dependency build() {

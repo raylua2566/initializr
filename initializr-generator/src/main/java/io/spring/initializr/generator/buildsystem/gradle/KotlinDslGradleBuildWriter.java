@@ -117,7 +117,6 @@ public class KotlinDslGradleBuildWriter extends GradleBuildWriter {
 			writer.println(configurationName + " {");
 			writer.indented(() -> writer.println(String.format("extendsFrom(%s)",
 					configurationCustomization.getExtendsFrom().stream()
-							.map((c) -> "configurations." + c + ".get()")
 							.collect(Collectors.joining(", ")))));
 			writer.println("}");
 		}
@@ -132,10 +131,27 @@ public class KotlinDslGradleBuildWriter extends GradleBuildWriter {
 	}
 
 	@Override
+	protected void writeConfigurations(IndentingWriter writer, GradleBuild build) {
+		Map<String, ConfigurationCustomization> configurationCustomizations = build
+				.getConfigurationCustomizations();
+		for (String configuration : build.getConfigurations()) {
+			writer.println("val " + configuration + " by configurations.creating");
+		}
+		if (configurationCustomizations.isEmpty()) {
+			return;
+		}
+		writer.println("configurations {");
+		writer.indented(() -> configurationCustomizations.forEach((name,
+				customization) -> writeConfiguration(writer, name, customization)));
+		writer.println("}");
+		writer.println("");
+	}
+
+	@Override
 	protected void writeDependency(IndentingWriter writer, Dependency dependency) {
 		String version = determineVersion(dependency.getVersion());
 		String type = dependency.getType();
-		writer.print(configurationForScope(dependency.getScope()) + "(\""
+		writer.print(configurationForDependency(dependency) + "(\""
 				+ dependency.getGroupId() + ":" + dependency.getArtifactId()
 				+ ((version != null) ? ":" + version : "")
 				+ ((type != null) ? "@" + type : "") + "\")");

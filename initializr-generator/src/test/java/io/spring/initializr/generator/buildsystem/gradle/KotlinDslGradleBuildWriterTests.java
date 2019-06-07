@@ -290,35 +290,33 @@ class KotlinDslGradleBuildWriterTests {
 		GradleBuild build = new GradleBuild();
 		build.addConfiguration("developmentOnly");
 		List<String> lines = generateBuild(build);
-		assertThat(lines).containsSequence("configurations {", "    developmentOnly",
-				"}");
+		assertThat(lines)
+				.containsSequence("val developmentOnly by configurations.creating");
 	}
 
 	@Test
 	void gradleBuildWithConfigurationCustomization() throws Exception {
 		GradleBuild build = new GradleBuild();
-		build.customizeConfiguration("developmentOnly",
-				(configuration) -> configuration.extendsFrom("compile"));
-		build.customizeConfiguration("developmentOnly",
-				(configuration) -> configuration.extendsFrom("testCompile"));
+		build.customizeConfiguration("runtimeClasspath",
+				(configuration) -> configuration.extendsFrom("custom1"));
+		build.customizeConfiguration("runtimeClasspath",
+				(configuration) -> configuration.extendsFrom("custom2"));
 		List<String> lines = generateBuild(build);
-		assertThat(lines).containsSequence("configurations {", "    developmentOnly {",
-				"        extendsFrom(configurations.compile.get(), configurations.testCompile.get())",
-				"    }", "}");
+		assertThat(lines).containsSequence("configurations {", "    runtimeClasspath {",
+				"        extendsFrom(custom1, custom2)", "    }", "}");
 	}
 
 	@Test
 	void gradleBuildWithConfigurationCustomizations() throws Exception {
 		GradleBuild build = new GradleBuild();
-		build.customizeConfiguration("developmentOnly",
-				(configuration) -> configuration.extendsFrom("compile"));
-		build.customizeConfiguration("testOnly",
-				(configuration) -> configuration.extendsFrom("testCompile"));
+		build.customizeConfiguration("runtimeClasspath",
+				(configuration) -> configuration.extendsFrom("custom1"));
+		build.customizeConfiguration("testRuntimeClasspath",
+				(configuration) -> configuration.extendsFrom("custom2"));
 		List<String> lines = generateBuild(build);
-		assertThat(lines).containsSequence("configurations {", "    developmentOnly {",
-				"        extendsFrom(configurations.compile.get())", "    }",
-				"    testOnly {", "        extendsFrom(configurations.testCompile.get())",
-				"    }", "}");
+		assertThat(lines).containsSequence("configurations {", "    runtimeClasspath {",
+				"        extendsFrom(custom1)", "    }", "    testRuntimeClasspath {",
+				"        extendsFrom(custom2)", "    }", "}");
 	}
 
 	@Test
@@ -414,6 +412,18 @@ class KotlinDslGradleBuildWriterTests {
 				"        exclude(group = \"com.example.legacy\", module = \"legacy-one\")",
 				"        exclude(group = \"com.example.another\", module = \"legacy-two\")",
 				"    }", "}");
+	}
+
+	@Test
+	void gradleBuildWithCustomDependencyConfiguration() throws IOException {
+		GradleBuild build = new GradleBuild();
+		build.dependencies().add("test", GradleDependency
+				.withCoordinates("org.springframework.boot", "spring-boot-starter-foobar")
+				.scope(DependencyScope.RUNTIME).configuration("myRuntime"));
+		List<String> lines = generateBuild(build);
+		assertThat(lines).containsSequence("dependencies {",
+				"    myRuntime(\"org.springframework.boot:spring-boot-starter-foobar\")",
+				"}");
 	}
 
 	@Test
