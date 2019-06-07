@@ -28,9 +28,9 @@ import org.springframework.core.Ordered;
  * @author Ray Lau
  */
 @FunctionalInterface
-public interface ApplicationPropertiesCustomizer extends Ordered {
+public interface ApplicationConfigurationFileCustomizer<T> extends Ordered {
 
-	void customize(Properties properties);
+	void customize(T properties);
 
 	@Override
 	default int getOrder() {

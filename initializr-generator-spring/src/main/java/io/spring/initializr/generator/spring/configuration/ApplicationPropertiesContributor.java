@@ -68,12 +68,12 @@ public class ApplicationPropertiesContributor extends SingleResourceProjectContr
 			properties.load(inStream);
 		}
 
-		List<ApplicationPropertiesCustomizer> customizers = this.applicationContext
-				.getBeanProvider(ApplicationPropertiesCustomizer.class).orderedStream()
+		List<ApplicationConfigurationFileCustomizer> customizers = this.applicationContext
+				.getBeanProvider(ApplicationConfigurationFileCustomizer.class).orderedStream()
 				.collect(Collectors.toList());
 
 		LambdaSafe
-				.callbacks(ApplicationPropertiesCustomizer.class, customizers, properties)
+				.callbacks(ApplicationConfigurationFileCustomizer.class, customizers, properties)
 				.invoke((customizer) -> customizer.customize(properties));
 
 		properties.store(Files.newOutputStream(resourceFile), null);
